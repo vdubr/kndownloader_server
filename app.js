@@ -4,6 +4,9 @@ var MapitoKnDown = require('kndownloader')
 var fs = require('fs');
 var path = require('path');
 
+var statsFilePath = './stats.json';
+var appPort = '3000'
+
 app.use(function(req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
@@ -17,7 +20,6 @@ app.get('/kn', function (req, res) {
       var srs = req.query.srs ? ('EPSG:' + req.query.srs) : 'EPSG:3857'
 
       if(knID && format && srs){
-        // var knDown = MapitoKnDown({id:602191,format:'shp',projection:'EPSG:3857'}).stream()
         var knDown = MapitoKnDown({
           id:knID,
           format:format,
@@ -49,8 +51,9 @@ app.get('/kn', function (req, res) {
 
           readStream.on('close', function(){
             if (!had_error) {
-              fs.unlinkSync(fullDirPath + 'data.zip')
-              fs.rmdir(fullDirPath)
+              addStatsItem(dirName);
+              fs.unlinkSync(fullDirPath + 'data.zip');
+              fs.rmdir(fullDirPath);
             };
           });
        })
@@ -61,6 +64,16 @@ app.get('/kn', function (req, res) {
       }
 });
 
+function addStatsItem(knDirName) {
+  var statsFile = fs.readFileSync(statsFilePath);
+  var stats = JSON.parse(statsFile);
+
+  stats.items.push(knDirName)
+  stats.count = stats.count + 1;
+
+  fs.writeFileSync(statsFilePath, JSON.stringify(stats, null, 4))
+}
+
 function getDirectories(srcpath) {
   return fs.readdirSync(srcpath).filter(function(file) {
     return fs.statSync(path.join(srcpath, file)).isDirectory();
@@ -68,32 +81,29 @@ function getDirectories(srcpath) {
 }
 
 app.get('/stats', function (req, res) {
-  var dirs = getDirectories('tmp')
+  var statsFile = fs.readFileSync(statsFilePath);
+  var stats = JSON.parse(statsFile);
 
   var byDays = {}
-  console.log(dirs)
   var sum = 0
-  dirs.forEach(function(dirName){
+  stats.items.forEach(function(dirName){
     sum++
     var knId = dirName.split('_')[1]
     var time = dirName.split('_')[0]
     var date = new Date()
     date.setTime(time)
-    console.log(date)
 
-    var dayId = date.getUTCFullYear() + '_' + date.getUTCMonth() + '_' + date.getUTCDate()
+    var dayId = date.getUTCFullYear() + '_' + (date.getUTCMonth() + 1) + '_' + date.getUTCDate()
     if(!byDays[dayId]){
       byDays[dayId] = {kn:[]}
     }
     byDays[dayId]['kn'].push(knId)
   })
-byDays['sum'] = sum
-res.json(byDays)
+  byDays['sum'] = sum
+  res.json(byDays)
 });
 
-var server = app.listen(3000, function () {
+var server = app.listen(appPort, function () {
   var host = server.address().address;
-  var port = server.address().port;
-
-  console.log('Example app listening at http://%s:%s', host, port);
+  console.log('Example app listening at http://%s:%s', host, appPort);
 });
