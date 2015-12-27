@@ -9,9 +9,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "express": "^4.13.1"
-  },
-  "dependencies": {
-    "kndownloader": "git+ssh://git@bitbucket.org/mapito/kndownloader.git"
+    "express": "^4.13.1",
+    "kndownloader": "0.0.3"
   }
 }
