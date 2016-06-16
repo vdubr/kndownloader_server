@@ -3,15 +3,35 @@ var app = express();
 var MapitoKnDown = require('kndownloader')
 var fs = require('fs');
 var path = require('path');
+var request = require('request');
+var https = require('https');
 
 var statsFilePath = './stats.json';
 var appPort = '3000'
+
+var options = {
+                cert: fs.readFileSync('./https/2_dubrovsky.eu.crt'),
+                key: fs.readFileSync('./https/server.key')
+};
+
 
 app.use(function(req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   next();
 });
+
+app.get('/proxy', function (req, res) {
+  const queryIndex = req.originalUrl.indexOf('?');
+  const url = req.originalUrl.substring(queryIndex + 1);
+
+  request
+    .get(url)
+    .on('error', function(err) {
+      console.log(err)
+    })
+    .pipe(res)
+})
 
 app.get('/kn', function (req, res) {
 
@@ -103,7 +123,9 @@ app.get('/stats', function (req, res) {
   res.json(byDays)
 });
 
-var server = app.listen(appPort, function () {
-  var host = server.address().address;
-  console.log('Example app listening at http://%s:%s', host, appPort);
+var server = https.createServer(options, app);
+
+server.listen(appPort, function () {
+  // var host = server.address().address;
+  console.log('Example app listening at https://');
 });
