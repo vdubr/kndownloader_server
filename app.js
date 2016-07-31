@@ -4,10 +4,11 @@ var MapitoKnDown = require('kndownloader')
 var fs = require('fs');
 var path = require('path');
 var request = require('request');
-var https = require('https');
+// var https = require('https');
+var http = require('http');
 
 var statsFilePath = './stats.json';
-var appPort = '3000'
+var appPort = 3000
 
 var options = {
                 cert: fs.readFileSync('./https/2_dubrovsky.eu.crt'),
@@ -123,9 +124,10 @@ app.get('/stats', function (req, res) {
   res.json(byDays)
 });
 
-var server = https.createServer(options, app);
+// var server = https.createServer(options, app);
+var server = http.createServer(app);
 
 server.listen(appPort, function () {
   // var host = server.address().address;
-  console.log('Example app listening at https://');
+  console.log('Example app listening at http://');
 });
