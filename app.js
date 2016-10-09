@@ -6,9 +6,12 @@ var path = require('path');
 var request = require('request');
 // var https = require('https');
 var http = require('http');
+var rimraf = require('rimraf');
 
 var statsFilePath = './stats.json';
 var appPort = 3000
+
+var DEFAULTTYPES = ['boundary', 'parcel', 'zoning'];
 
 var options = {
                 cert: fs.readFileSync('./https/2_dubrovsky.eu.crt'),
@@ -35,17 +38,19 @@ app.get('/proxy', function (req, res) {
 })
 
 app.get('/kn', function (req, res) {
-
+      clearOlderDirectories('tmp/', 10000);
       var knID = req.query.id
       var format = req.query.format || 'shp'
       var srs = req.query.srs ? ('EPSG:' + req.query.srs) : 'EPSG:3857'
-
+      var types = req.query.types ? req.query.types.split(',') : DEFAULTTYPES;
       if(knID && format && srs){
         var knDown = MapitoKnDown({
           id:knID,
           format:format,
-          projection:srs}
-        ).stream()
+          projection:srs,
+          types: types
+        }).stream()
+
         var d =  new Date()
         var dirName =  d.getTime().toString() + '_' + knID
         var fullDirPath = './tmp/'+dirName+'/'
@@ -58,32 +63,44 @@ app.get('/kn', function (req, res) {
           fs.mkdirSync(fullDirPath)
         }
 
-       knDown.on('compressed',function(){
-          var readStream = fs.createReadStream(fullDirPath+'data.zip');
-          readStream.on('open', function () {
-            readStream.pipe(res);
-          });
+        var suffix = types.length >1 ? 'zip' : getSuffix(format);
+        var savePath = fullDirPath + 'data.' + suffix;
+        var ws = fs.createWriteStream(savePath);
 
+        ws.on('finish', function() {
+          sendResponse(savePath, res, fullDirPath, dirName)
+        }.bind(this))
 
-          var had_error = false;
-          readStream.on('error', function(err){
-            had_error = true;
-          });
+        ws.on('error', function() {
+          console.log('errrrrr');
+        }.bind(this))
 
-          readStream.on('close', function(){
-            if (!had_error) {
-              addStatsItem(dirName);
-              fs.unlinkSync(fullDirPath + 'data.zip');
-              fs.rmdir(fullDirPath);
-            };
-          });
-       })
-
-      var ws = fs.createWriteStream(fullDirPath+'data.zip');
-
-      knDown.pipe(ws);
+        knDown.pipe(ws);
       }
 });
+
+var sendResponse = function(savePath, res, fullDirPath, dirName) {
+      var readStream = fs.createReadStream(savePath);
+      readStream.on('open', function () {
+        readStream.pipe(res);
+      });
+
+
+      var had_error = false;
+      readStream.on('error', function(err){
+        had_error = true;
+        console.log('erron on read transform file');
+      });
+
+      readStream.on('close', function(){
+        console.log('close session');
+        if (!had_error) {
+          addStatsItem(dirName);
+          //remove file on close session
+          fs.unlinkSync(savePath);
+        };
+      });
+}
 
 function addStatsItem(knDirName) {
   var statsFile = fs.readFileSync(statsFilePath);
@@ -131,3 +148,60 @@ server.listen(appPort, function () {
   // var host = server.address().address;
   console.log('Example app listening at http://');
 });
+
+
+
+/**
+ * @private
+ */
+var clearOlderDirectories = function(dataPath, maxAge) {
+  var directories = fs.readdirSync(dataPath);
+  directories.forEach(function(dir){
+    removeDirIfIsOlder(dir, maxAge, dataPath)
+  });
+};
+
+
+ /**
+  * @param {string} directory
+  * @private
+  */
+var removeDirIfIsOlder = function(directory, maxAge, dataPath) {
+  console.log('DDD',directory);
+  var spl = directory.split('_');
+  if (spl.length === 2) {
+    var dirTime = spl[0];
+    var curTime = new Date();
+    var timeDifference = curTime - dirTime;
+    if (timeDifference > maxAge) {
+      rimraf(dataPath + directory, function(err) {
+        console.log('done delete');
+      });
+    }
+  }else {
+    rimraf(dataPath + directory, function(err) {
+      console.log('done delete');
+    });
+  }
+};
+
+
+
+/**
+ * Same as in NPM kndownloader
+ * @param {formats} format
+ * @return {string}
+ * @private
+ */
+getSuffix = function(format) {
+  var suffix;
+  switch (format) {
+    case 'shp':
+      suffix = 'zip';
+      break;
+    default:
+      suffix = format;
+      break;
+  }
+  return suffix;
+};
