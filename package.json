@@ -10,7 +10,7 @@
   "license": "ISC",
   "devDependencies": {
     "express": "^4.13.1",
-    "kndownloader": "0.1.0",
+    "kndownloader": "0.1.1",
     "request": "^2.72.0",
     "rimraf": "~2.3.2"
   }
