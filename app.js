@@ -19,10 +19,17 @@ var options = {
 };
 
 
-app.use(function(req, res, next) {
+app.use(/\/proxy|\/stats|\/getdata|\/kn/,function(req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-  next();
+  return next();
+});
+
+app.get('/getdata', function (req, res) {
+  var path = req.query.path;
+  if(path) {
+    sendResponse(path, res);
+  }
 });
 
 app.get('/proxy', function (req, res) {
@@ -38,7 +45,7 @@ app.get('/proxy', function (req, res) {
 })
 
 app.get('/kn', function (req, res) {
-      clearOlderDirectories('tmp/', 10000);
+      clearOlderDirectories('tmp/', 100000);
       var knID = req.query.id
       var format = req.query.format || 'shp'
       var srs = req.query.srs ? ('EPSG:' + req.query.srs) : 'EPSG:3857'
@@ -66,9 +73,9 @@ app.get('/kn', function (req, res) {
         var suffix = types.length >1 ? 'zip' : getSuffix(format);
         var savePath = fullDirPath + 'data.' + suffix;
         var ws = fs.createWriteStream(savePath);
-
         ws.on('finish', function() {
-          sendResponse(savePath, res, fullDirPath, dirName)
+          //return path to data
+          res.send(savePath);
         }.bind(this))
 
         ws.on('error', function() {
@@ -79,9 +86,15 @@ app.get('/kn', function (req, res) {
       }
 });
 
-var sendResponse = function(savePath, res, fullDirPath, dirName) {
+var sendResponse = function(savePath, res, dirName) {
+      var splitPath = savePath.split('/');
+      var dirName = splitPath[splitPath.length-2];
+      var origFileName = splitPath[splitPath.length-1];
+      var origFileNameExtension = origFileName.split('.')[1];
+      var fileName = dirName.split('_')[1];
       var readStream = fs.createReadStream(savePath);
       readStream.on('open', function () {
+        res.setHeader('Content-Disposition', 'attachment; filename=\"'+fileName+'.'+origFileNameExtension+'"');
         readStream.pipe(res);
       });
 
