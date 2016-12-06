@@ -9,7 +9,7 @@ var http = require('http');
 var rimraf = require('rimraf');
 
 var statsFilePath = './stats.json';
-var appPort = 3000
+var appPort = 4000
 
 var DEFAULTTYPES = ['boundary', 'parcel', 'zoning'];
 
